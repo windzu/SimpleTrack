@@ -2,7 +2,7 @@
 Author: windzu windzu1@gmail.com
 Date: 2023-04-07 11:25:50
 LastEditors: windzu windzu1@gmail.com
-LastEditTime: 2023-04-07 18:09:19
+LastEditTime: 2023-04-07 19:04:55
 Description: 
 Copyright (c) 2023 by windzu, All Rights Reserved. 
 '''
@@ -13,30 +13,14 @@ from mot_3d.mot import MOTModel
 from mot_3d.frame_data import FrameData
 from data_loader import WaymoLoader
 
-parser = argparse.ArgumentParser()
-# running configurations
-parser.add_argument('--name', type=str, default='demo')
-parser.add_argument('--det_name', type=str, default='cp')
-parser.add_argument('--process', type=int, default=1)
-parser.add_argument('--visualize', action='store_true', default=False)
-parser.add_argument(
-    '--start_frame',
-    type=int,
-    default=0,
-    help='start at a middle frame for debug')
-parser.add_argument(
-    '--obj_type',
-    type=str,
-    default='vehicle',
-    choices=['vehicle', 'pedestrian', 'cyclist'])
-# paths
-parser.add_argument(
-    '--config_path', type=str, default='configs/waymo_configs/vc_kf_giou.yaml')
-parser.add_argument('--result_folder', type=str, default='./mot_results/')
-parser.add_argument('--data_folder', type=str, default='./demo_data/')
-parser.add_argument(
-    '--gt_folder', type=str, default='./demo_data/detection/gt/dets/')
-args = parser.parse_args()
+# ros
+import rospy
+from sensor_msgs.msg import PointCloud2
+from tf2_geometry_msgs import PoseStamped
+
+# local msg
+from autodriver_msgs import BodyStatus
+from autodriver_msgs import DetectedObjectArray
 
 
 def load_gt_bboxes(gt_folder, data_folder, segment_name, type_token):
@@ -222,18 +206,39 @@ def main(name,
             states=states)
 
 
+class TestTrack:
+
+    def __init__(self, args):
+        pass
+
+
+global_gnss_pose = PoseStamped()
+global_body_status = BodyStatus()
+
+
+def pc_callback(msg):
+    pass
+
+
+def objects_callback(msg):
+    pass
+
+
 if __name__ == '__main__':
-    result_folder = os.path.join(args.result_folder, args.name)
-    os.makedirs(result_folder, exist_ok=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--node_name', type=str, default='simple_track')
+    parser.add_argument('--pc_topic', type=str, default='/lidar_points/top')
 
-    summary_folder = os.path.join(result_folder, 'summary')
-    os.makedirs(summary_folder, exist_ok=True)
+    args = parser.parse_args()
 
-    summary_folder = os.path.join(summary_folder, args.obj_type)
-    os.makedirs(summary_folder, exist_ok=True)
-
-    det_data_folder = os.path.join(args.data_folder, 'detection',
-                                   args.det_name)
+    # init ros node
+    rospy.init_node(args.node_name, anonymous=True)
+    pc_sub = rospy.Subscriber(args.pc_topic, PointCloud2, pc_callback)
+    objects_sub = rospy.Subscriber('objects', Objects, objects_callback)
+    gnss_sub = rospy.Subscriber('gnss', Gnss, gnss_callback)
+    body_status_sub = rospy.Subscriber('body_status', BodyStatus,
+                                       body_status_callback)
+    rospy.spin()
 
     if args.process > 1:
         pool = multiprocessing.Pool(args.process)
@@ -243,9 +248,3 @@ if __name__ == '__main__':
                 args=(args.name, args.obj_type, args.config_path,
                       args.data_folder, det_data_folder, result_folder,
                       args.gt_folder, 0, token, args.process))
-        pool.close()
-        pool.join()
-    else:
-        main(args.name, args.obj_type, args.config_path, args.data_folder,
-             det_data_folder, result_folder, args.gt_folder, args.start_frame,
-             0, 1)
